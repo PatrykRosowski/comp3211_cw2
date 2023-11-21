@@ -1,7 +1,6 @@
 import logging
 import azure.functions as func
 from azure.functions.decorators.core import DataType
-import uuid
 
 app = func.FunctionApp()
 
