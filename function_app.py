@@ -1,6 +1,6 @@
-import logging
+import logging, os, pyodbc
 import azure.functions as func
-from azure.functions.decorators.core import DataType
+
 
 app = func.FunctionApp()
 
@@ -8,20 +8,44 @@ app = func.FunctionApp()
 @app.schedule(schedule="*/5 * * * * *", arg_name="myTimer", 
               run_on_startup=False,
               use_monitor=False)
-@app.generic_output_binding(arg_name="toDoItems", 
-                            type="sql", CommandText="dbo.LeedsSensorsData", 
-                            ConnectionStringSetting="SqlConnectionString",
-                            data_type=DataType.STRING)
-def data_collection(myTimer: func.TimerRequest, toDoItems: func.Out[func.SqlRow]) -> None:
+
+def data_collection(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
         logging.info('The timer is past due!')
 
     logging.info('data_collection function executed.')
 
-    toDoItems.set(func.SqlRow({"Temperature": 45, 
-                               "Wind": 50, 
-                               "R_Humidity": 55, 
-                               "CO2": 60}))
+    # Establish a database connection using the connection string stored in
+    # local.settings.json (local) and an environment variable on Azure (deployed)
+    db_connection = pyodbc.connect(os.environ["SqlConnectionString"])
+    # Create a cursor object to manipulate the db table using sql queries
+    cursor = db_connection.cursor()
+
+    query = """
+        IF EXISTS (SELECT 1 FROM LeedsSensorsData)
+        BEGIN
+            UPDATE LeedsSensorsData
+            SET Temperature = 100, 
+                Wind = 100, 
+                R_Humidity = 100, 
+                CO2 = 100
+            WHERE Sensor_ID = 1
+        END
+        ELSE
+        BEGIN
+            INSERT INTO LeedsSensorsData (Sensor_ID, Temperature, Wind, R_Humidity, CO2)
+            VALUES (200, 200, 200, 200, 200)
+        END
+
+    """
+    # Use the cursor to execute the update/insert query
+    cursor.execute(query)
+    # Commit the db changes
+    db_connection.commit()
+
+    # Clean up by closing the cursor object and the db connection
+    cursor.close()
+    db_connection.close()
 
 @app.event_grid_trigger(arg_name="azeventgrid")
 def stats(azeventgrid: func.EventGridEvent):
