@@ -108,7 +108,6 @@ def data_collection(myTimer: func.TimerRequest) -> None:
                         TableName="LeedsSensorsData",
                         ConnectionStringSetting="SqlConnectionStringTask2")
 def stats(change: str) -> None:
-    logging.info("SQL Changes: %s", json.loads(change))
 
     for record in json.loads(change):
         sensor_info = record["Item"]
@@ -118,9 +117,3 @@ def stats(change: str) -> None:
               + str(sensor_info["Wind"]) + "\n"
               + str(sensor_info["R_Humidity"]) + "\n"
               + str(sensor_info["CO2"]) + "\n")
-    """
-    # Establish a database connection using the connection string stored in
-    # local.settings.json (local) and an environment variable on Azure (deployed)
-    db_connection = pyodbc.connect(os.environ["SqlConnectionString"])
-    # Create a cursor object to manipulate the db table using sql queries
-    cursor = db_connection.cursor()"""
