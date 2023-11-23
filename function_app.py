@@ -1,15 +1,16 @@
-import logging, os, pyodbc
+import logging, os, pyodbc, json
 import azure.functions as func
 from random import randint as randint
 
 
 app = func.FunctionApp()
 
+# The function used for simulating data collection from sensors
+# and performing an insert/update operation in the database
 @app.function_name(name="data_collection")
 @app.schedule(schedule="*/5 * * * * *", arg_name="myTimer", 
-              run_on_startup=False,
+              run_on_startup=True,
               use_monitor=False)
-
 def data_collection(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
         logging.info('The timer is past due!')
@@ -36,7 +37,7 @@ def data_collection(myTimer: func.TimerRequest) -> None:
 
     # Establish a database connection using the connection string stored in
     # local.settings.json (local) and an environment variable on Azure (deployed)
-    db_connection = pyodbc.connect(os.environ["SqlConnectionString"])
+    db_connection = pyodbc.connect(os.environ["SqlConnectionStringTask1"])
     # Create a cursor object to manipulate the db table using sql queries
     cursor = db_connection.cursor()
 
@@ -100,6 +101,18 @@ def data_collection(myTimer: func.TimerRequest) -> None:
     cursor.close()
     db_connection.close()
 
-@app.event_grid_trigger(arg_name="azeventgrid")
-def stats(azeventgrid: func.EventGridEvent):
-    logging.info('Python EventGrid trigger processed an event')
+# The function responsible for calculating statistical data
+# It gets triggered whenever a change in the database is detected
+@app.function_name(name="stats")
+@app.generic_trigger(arg_name="change", type="sqlTrigger",
+                        TableName="LeedsSensorsData",
+                        ConnectionStringSetting="SqlConnectionStringTask2")
+def stats(change: str) -> None:
+    logging.info("SQL Changes: %s", json.loads(change))
+
+    """
+    # Establish a database connection using the connection string stored in
+    # local.settings.json (local) and an environment variable on Azure (deployed)
+    db_connection = pyodbc.connect(os.environ["SqlConnectionString"])
+    # Create a cursor object to manipulate the db table using sql queries
+    cursor = db_connection.cursor()"""
