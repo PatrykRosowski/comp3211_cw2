@@ -110,6 +110,14 @@ def data_collection(myTimer: func.TimerRequest) -> None:
 def stats(change: str) -> None:
     logging.info("SQL Changes: %s", json.loads(change))
 
+    for record in json.loads(change):
+        sensor_info = record["Item"]
+        print("Sensor ID = " + str(sensor_info["Sensor_ID"]) + "\n")
+        print("It's data = \n"
+              + str(sensor_info["Temperature"]) + "\n"
+              + str(sensor_info["Wind"]) + "\n"
+              + str(sensor_info["R_Humidity"]) + "\n"
+              + str(sensor_info["CO2"]) + "\n")
     """
     # Establish a database connection using the connection string stored in
     # local.settings.json (local) and an environment variable on Azure (deployed)
