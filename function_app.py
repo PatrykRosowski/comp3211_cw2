@@ -1,4 +1,4 @@
-import logging, os, pyodbc, json
+import logging, os, pyodbc
 import azure.functions as func
 from random import randint as randint
 
@@ -7,6 +7,7 @@ app = func.FunctionApp()
 
 # The function used for simulating data collection from sensors
 # and performing an insert operation in the database
+# It runs every 5 seconds, for testing and demonstration purpose
 @app.function_name(name="data_collection")
 @app.schedule(schedule="*/5 * * * * *", arg_name="myTimer", 
               run_on_startup=True,
@@ -22,7 +23,7 @@ def data_collection(myTimer: func.TimerRequest) -> None:
 
     # A nested dictionary storing data from each sensor
     # key = sensor ID
-    # value = a dictionary with the data for this sensor
+    # value = a sub-dictionary with the data for this sensor
     collected_data = {}
 
     # This 'for' loop generates random data for each sensor ID
@@ -40,8 +41,6 @@ def data_collection(myTimer: func.TimerRequest) -> None:
             INSERT INTO LeedsSensorsData (Sensor_ID, Temperature, Wind, R_Humidity, CO2)
             VALUES (?, ?, ?, ?, ?)
     """
-
-    
 
     # To ensure that the ACID rules are followed, I will use the try/except statements
     # and rollback any changes in case of an error
@@ -92,13 +91,26 @@ def data_collection(myTimer: func.TimerRequest) -> None:
                         ConnectionStringSetting="SqlConnectionStringTask2")
 def stats(change: str) -> None:
 
-    # SQL query
+    # SQL query that calculates min, max and avg for each field of each sensor
+    # and returns records containing the information that we need to display.
+    # The average values are cast to float and rounded to two decimal places, 
+    # to avoid situations where the average between 1 and 2 is given as 1 instead of 1.5
+    # (AVG statement seems to round down the halves instead of round up)
     query = """
     SELECT 
         Sensor_ID,
-        AVG(Temperature) AS AvgTemperature,
-        MIN(Temperature) AS MinTemperature,
-        MAX(Temperature) AS MaxTemperature
+        ROUND(AVG(CAST(Temperature AS float)), 2) AS avg_temp,
+        MIN(Temperature) AS min_temp,
+        MAX(Temperature) AS max_temp,
+        ROUND(AVG(CAST(Wind AS float)), 2) as avg_wind,
+        MIN(Wind) as min_wind,
+        MAX(Wind) as max_wind,
+        ROUND(AVG(CAST(R_Humidity AS float)), 2) as avg_humidity,
+        MIN(R_Humidity) as min_humidity,
+        MAX(R_Humidity) as max_humidity,
+        ROUND(AVG(CAST(CO2 AS float)), 2) as avg_co2,
+        MIN(CO2) as min_co2,
+        MAX(CO2) as max_co2
     FROM 
         LeedsSensorsData
     GROUP BY 
@@ -137,12 +149,21 @@ def stats(change: str) -> None:
 
         # Concatenate the data for each string with the 'ordered_logs' string
         for record in sorted_data:
-            ordered_logs += (f"Sensor ID: {record.Sensor_ID}, " + 
-                            f"Avg Temp: {record.AvgTemperature}, " +
-                            f"Min Temp: {record.MinTemperature}, " +
-                            f"Max Temp: {record.MaxTemperature}\n")
+            ordered_logs += (f"\nSensor ID: {record.Sensor_ID}, " + 
+                            f"Average temp: {record.avg_temp}, " +
+                            f"Min. temp: {record.min_temp}, " +
+                            f"Max. temp: {record.max_temp}\n" +
+                            f"               Average wind: {record.avg_wind}, " +
+                            f"Min. wind: {record.min_wind}, " +
+                            f"Max. wind: {record.max_wind}\n" +
+                            f"               Average humidity: {record.avg_humidity}, " +
+                            f"Min. humidity: {record.min_humidity}, " +
+                            f"Max. humidity: {record.max_humidity}\n" +
+                            f"               Average CO2: {record.avg_co2}, " +
+                            f"Min. CO2: {record.min_co2}, " +
+                            f"Max. CO2: {record.max_co2}\n")
 
-        # Log the results
+        # Output the results
         logging.info(ordered_logs)
 
     # If a pyodbc error occurs, roll back the changes and display the error
